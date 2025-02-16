@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Your Ambulance</title>
+  <link rel="stylesheet" href="https://firebasestorage.googleapis.com/v0/b/itsgaurav-23.appspot.com/o/Ambulance%2Fstyle.css?alt=media&token=f237d58f-b08d-4fa0-8abe-fd8f6d2afec4">
+  <link rel="icon" type="image/png" href="https://firebasestorage.googleapis.com/v0/b/itsgaurav-23.appspot.com/o/Ambulance%2FPicsart_25-02-16_15-46-09-142.png?alt=media&token=97b458cf-61da-4431-b6b3-4a180ffe5f7e">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Book Your Ambulance</h1>
+  </header>
+
+  <!-- Authentication Section -->
+  <section class="auth-section" id="auth-section">
+    <h2 id="auth-heading">Login as User</h2>
+    <div id="auth-options">
+      <button id="login-as-user-button">Login as User</button>
+      <button id="login-as-driver-button">Login as Driver</button>
+    </div>
+
+    <!-- User Login Form -->
+    <form id="user-login-form" class="login-form">
+      <input type="email" id="user-email" placeholder="Email" required />
+      <div class="password-container">
+        <input type="password" id="user-password" placeholder="Password" required />
+      </div>
+      <button type="submit" id="user-login-submit">Login</button>
+      <p id="toggle-auth-user">Don't have an account? <span id="switch-to-signup-user">Signup</span></p>
+      <p id="user-login-message" class="message"></p>
+    </form>
+
+    <!-- Driver Login Form -->
+    <form id="driver-login-form" class="login-form" style="display: none;">
+      <input type="email" id="driver-email" placeholder="Email" required />
+      <div class="password-container">
+        <input type="password" id="driver-password" placeholder="Password" required />
+      </div>
+      <button type="submit" id="driver-login-submit">Login</button>
+      <p id="toggle-auth-driver">Don't have an account? <span id="switch-to-signup-driver">Signup</span></p>
+      <p id="driver-login-message" class="message"></p>
+    </form>
+
+    <!-- User Signup Form -->
+    <form id="user-signup-form" class="login-form" style="display: none;">
+      <input type="email" id="user-signup-email" placeholder="Email" required />
+      <div class="password-container">
+        <input type="password" id="user-signup-password" placeholder="Password" required />
+      </div>
+      <button type="submit" id="user-signup-submit">Signup</button>
+      <p id="toggle-auth-user">Already have an account? <span id="switch-to-login-user">Login</span></p>
+      <p id="user-signup-message" class="message"></p>
+    </form>
+
+    <!-- Driver Signup Form -->
+    <form id="driver-signup-form" class="login-form" style="display: none;">
+      <input type="email" id="driver-signup-email" placeholder="Email" required />
+      <div class="password-container">
+        <input type="password" id="driver-signup-password" placeholder="Password" required />
+      </div>
+      <button type="submit" id="driver-signup-submit">Signup</button>
+      <p id="toggle-auth-driver">Already have an account? <span id="switch-to-login-driver">Login</span></p>
+      <p id="driver-signup-message" class="message"></p>
+    </form>
+  </section>
+
+  <!-- User Main Section -->
+  <main id="user-main-section" style="display: none;">
+    <section id="booking-section">
+      <h2>Book an Ambulance</h2>
+      <form id="booking-form">
+        <label for="type">Ambulance Type:</label>
+        <select id="type" required>
+          <option value="Basic">Basic Life Support</option>
+          <option value="Advanced">Advanced Life Support</option>
+        </select>
+        <br>
+        <label for="name">Your Name:</label>
+        <input type="text" id="name" placeholder="Name" required />
+
+        <label for="phone">Your Phone:</label>
+        <input type="tel" id="phone" placeholder="Phone Number" required />
+
+        <label for="location">Location:</label>
+        <input id="location" placeholder="Select location on the map" readonly required />
+        <div id="map"></div>
+
+        <label for="time">Preferred Time:</label>
+        <input type="datetime-local" id="time" required />
+
+        <button type="submit">Book Now</button>
+        <p id="booking-message" class="message"></p>
+      </form>
+    </section>
+  </main>
+
+  <!-- Driver Main Section -->
+  <main id="driver-main-section" style="display: none;">
+
+    <section id="driver-bookings-section">
+      <h2>Bookings</h2>
+      <div id="bookings-list"></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getDatabase, ref, set, get, onValue, remove, push } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-database.js";
+
+    // Firebase Configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyDIlbmAiEjv10tVYDz59h9X90FOTXST63E",
+      authDomain: "itsgaurav-23.firebaseapp.com",
+      projectId: "itsgaurav-23",
+      storageBucket: "itsgaurav-23.appspot.com",
+      messagingSenderId: "77835550750",
+      appId: "1:77835550750:web:da62092ab4ca8852f9ae0f",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    // Set persistence to LOCAL (default behavior)
+    setPersistence(auth, browserLocalPersistence)
+      .then(() => {
+        console.log("Persistence set to LOCAL");
+      })
+      .catch((error) => {
+        console.error("Error setting persistence:", error);
+      });
+
+    const logoutButton = document.getElementById("logout-button");
+
+    // Toggle between User and Driver Login Forms
+    const loginAsUserButton = document.getElementById("login-as-user-button");
+    const loginAsDriverButton = document.getElementById("login-as-driver-button");
+    const userLoginForm = document.getElementById("user-login-form");
+    const driverLoginForm = document.getElementById("driver-login-form");
+    const userSignupForm = document.getElementById("user-signup-form");
+    const driverSignupForm = document.getElementById("driver-signup-form");
+
+    loginAsUserButton.addEventListener("click", () => {
+      document.getElementById("auth-heading").textContent = "Login as User";
+      userLoginForm.style.display = "block";
+      driverLoginForm.style.display = "none";
+      userSignupForm.style.display = "none";
+      driverSignupForm.style.display = "none";
+    });
+
+    loginAsDriverButton.addEventListener("click", () => {
+      document.getElementById("auth-heading").textContent = "Login as Driver";
+      userLoginForm.style.display = "none";
+      driverLoginForm.style.display = "block";
+      userSignupForm.style.display = "none";
+      driverSignupForm.style.display = "none";
+    });
+
+    // Toggle between Login and Signup for User
+    document.getElementById("switch-to-signup-user").addEventListener("click", () => {
+      userLoginForm.style.display = "none";
+      userSignupForm.style.display = "block";
+      document.getElementById("auth-heading").textContent = "Signup as User";
+    });
+
+    document.getElementById("switch-to-login-user").addEventListener("click", () => {
+      userSignupForm.style.display = "none";
+      userLoginForm.style.display = "block";
+      document.getElementById("auth-heading").textContent = "Login as User";
+    });
+
+    // Toggle between Login and Signup for Driver
+    document.getElementById("switch-to-signup-driver").addEventListener("click", () => {
+      driverLoginForm.style.display = "none";
+      driverSignupForm.style.display = "block";
+      document.getElementById("auth-heading").textContent = "Signup as Driver";
+    });
+
+    document.getElementById("switch-to-login-driver").addEventListener("click", () => {
+      driverSignupForm.style.display = "none";
+      driverLoginForm.style.display = "block";
+      document.getElementById("auth-heading").textContent = "Login as Driver";
+    });
+
+    // User Login
+    const userLoginFormElement = document.getElementById("user-login-form");
+    userLoginFormElement.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("user-email").value;
+      const password = document.getElementById("user-password").value;
+
+      signInWithEmailAndPassword(auth, email, password)
+        .then(() => {
+          document.getElementById("user-login-message").textContent = "Login successful!";
+          document.getElementById("user-login-message").style.color = "green";
+          document.getElementById("auth-section").style.display = "none";
+          document.getElementById("user-main-section").style.display = "block";
+          logoutButton.style.display = "block";
+        })
+        .catch((error) => {
+          document.getElementById("user-login-message").textContent = error.message;
+          document.getElementById("user-login-message").style.color = "red";
+        });
+    });
+
+    // Driver Login
+    const driverLoginFormElement = document.getElementById("driver-login-form");
+    driverLoginFormElement.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("driver-email").value;
+      const password = document.getElementById("driver-password").value;
+
+      signInWithEmailAndPassword(auth, email, password)
+        .then(() => {
+          document.getElementById("driver-login-message").textContent = "Login successful!";
+          document.getElementById("driver-login-message").style.color = "green";
+          document.getElementById("auth-section").style.display = "none";
+          document.getElementById("driver-main-section").style.display = "block";
+          logoutButton.style.display = "block";
+        })
+        .catch((error) => {
+          document.getElementById("driver-login-message").textContent = error.message;
+          document.getElementById("driver-login-message").style.color = "red";
+        });
+    });
+
+    // User Signup
+    const userSignupFormElement = document.getElementById("user-signup-form");
+    userSignupFormElement.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("user-signup-email").value;
+      const password = document.getElementById("user-signup-password").value;
+
+      createUserWithEmailAndPassword(auth, email, password)
+        .then((userCred) => {
+          set(ref(db, "users/" + userCred.user.uid), { type: "user" });
+          document.getElementById("user-signup-message").textContent = "Signup successful!";
+          document.getElementById("user-signup-message").style.color = "green";
+          document.getElementById("user-signup-form").style.display = "none";
+          document.getElementById("user-login-form").style.display = "block";
+          document.getElementById("auth-heading").textContent = "Login as User";
+        })
+        .catch((error) => {
+          document.getElementById("user-signup-message").textContent = error.message;
+          document.getElementById("user-signup-message").style.color = "red";
+        });
+    });
+
+    // Driver Signup
+    const driverSignupFormElement = document.getElementById("driver-signup-form");
+    driverSignupFormElement.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("driver-signup-email").value;
+      const password = document.getElementById("driver-signup-password").value;
+
+      createUserWithEmailAndPassword(auth, email, password)
+        .then((userCred) => {
+          set(ref(db, "users/" + userCred.user.uid), { type: "driver", status: "offline" });
+          document.getElementById("driver-signup-message").textContent = "Signup successful!";
+          document.getElementById("driver-signup-message").style.color = "green";
+          document.getElementById("driver-signup-form").style.display = "none";
+          document.getElementById("driver-login-form").style.display = "block";
+          document.getElementById("auth-heading").textContent = "Login as Driver";
+        })
+        .catch((error) => {
+          document.getElementById("driver-signup-message").textContent = error.message;
+          document.getElementById("driver-signup-message").style.color = "red";
+        });
+    });
+
+    // Check Authentication State on Page Load
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is logged in
+        const userRef = ref(db, "users/" + user.uid);
+        get(userRef).then((snapshot) => {
+          const userData = snapshot.val();
+
+          if (userData.type === "user") {
+            // Show user main section
+            document.getElementById("auth-section").style.display = "none";
+            document.getElementById("user-main-section").style.display = "block";
+            document.getElementById("logout-button").style.display = "block";
+          } else if (userData.type === "driver") {
+            // Show driver main section
+            document.getElementById("auth-section").style.display = "none";
+            document.getElementById("driver-main-section").style.display = "block";
+            document.getElementById("logout-button").style.display = "block";
+          }
+        });
+      } else {
+        // User is not logged in
+        document.getElementById("auth-section").style.display = "block";
+        document.getElementById("user-main-section").style.display = "none";
+        document.getElementById("driver-main-section").style.display = "none";
+        document.getElementById("logout-button").style.display = "none";
+      }
+    });
+
+    // Map Initialization
+    let map = L.map("map").setView([18.5204, 73.8567], 13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+    let marker;
+    map.on("click", (e) => {
+      const { lat, lng } = e.latlng;
+      document.getElementById("location").value = `Lat: ${lat}, Lng: ${lng}`;
+      if (marker) map.removeLayer(marker);
+      marker = L.marker([lat, lng]).addTo(map);
+    });
+
+    // Listen for User Bookings
+    onValue(ref(db, "bookings"), (snapshot) => {
+      const bookingsList = document.getElementById("bookings-list");
+      bookingsList.innerHTML = ""; // Clear previous bookings
+
+      const bookings = snapshot.val();
+      if (bookings) {
+        Object.keys(bookings).forEach((key) => {
+          const booking = bookings[key];
+          const bookingDiv = document.createElement("div");
+          bookingDiv.className = "booking";
+
+          // Extract latitude and longitude from the location string
+          const location = booking.location;
+          const latLngRegex = /Lat:\s*(-?\d+\.\d+),\s*Lng:\s*(-?\d+\.\d+)/;
+          const match = location.match(latLngRegex);
+          let googleMapsLink = "#";
+
+          if (match) {
+            const lat = match[1];
+            const lng = match[2];
+            googleMapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
+          }
+
+          bookingDiv.innerHTML = `
+            <p><strong>Name:</strong> ${booking.name}</p>
+            <p><strong>Phone:</strong> ${booking.phone}</p>
+            <p><strong>Location:</strong> <a href="${googleMapsLink}" target="_blank">${booking.location}</a></p>
+            <p><strong>Ambulance Type:</strong> ${booking.type}</p>
+            <p><strong>Preferred Time:</strong> ${booking.time}</p>
+            <button class="complete-booking-button" data-key="${key}">Complete Booking</button>
+            <p class="booking-message"></p>
+          `;
+
+          const completeButton = bookingDiv.querySelector(".complete-booking-button");
+          const bookingMessage = bookingDiv.querySelector(".booking-message");
+
+          completeButton.addEventListener("click", () => {
+            remove(ref(db, "bookings/" + key))
+              .then(() => {
+                bookingMessage.textContent = "Booking completed!";
+                bookingMessage.style.color = "green";
+              })
+              .catch((error) => {
+                bookingMessage.textContent = error.message;
+                bookingMessage.style.color = "red";
+              });
+          });
+
+          bookingsList.appendChild(bookingDiv);
+        });
+      }
+    });
+
+    // User Booking Submission
+    const bookingForm = document.getElementById("booking-form");
+    bookingForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const type = document.getElementById("type").value;
+      const name = document.getElementById("name").value;
+      const phone = document.getElementById("phone").value;
+      const location = document.getElementById("location").value;
+      const time = document.getElementById("time").value;
+
+      // Save booking details to Firebase
+      const newBookingRef = push(ref(db, "bookings"));
+      set(newBookingRef, { type, name, phone, location, time })
+        .then(() => {
+          document.getElementById("booking-message").textContent = "Booking successful!";
+          document.getElementById("booking-message").style.color = "green";
+        })
+        .catch((error) => {
+          document.getElementById("booking-message").textContent = error.message;
+          document.getElementById("booking-message").style.color = "red";
+        });
+    });
+
+    // Show/Hide Password Functionality
+    function togglePassword(inputId) {
+      const passwordInput = document.getElementById(inputId);
+      if (passwordInput.type === "password") {
+        passwordInput.type = "text";
+      } else {
+        passwordInput.type = "password";
+      }
+    }
+  </script>
+</body>
+</html>
